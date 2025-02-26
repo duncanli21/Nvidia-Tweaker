@@ -1,0 +1,11 @@
+[package]
+name = "nvidia-tweaker"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iced = { version = "0.13.1", features = ["smol"] }
+magic = "0.16.2"
+nvml-wrapper = "0.10.0"
+nvml-wrapper-sys = "0.8.0"
+sudo2 = "0.2.1"
