@@ -1,5 +1,7 @@
 use iced::time::{self, Duration};
-use iced::widget::{progress_bar, button, center, column, container, row, text, text_input, toggler};
+use iced::widget::{
+    button, center, column, container, progress_bar, row, text, text_input, toggler,
+};
 use iced::{Alignment, Border, Center, Element, Fill, Left, Right, Subscription, Task, Theme, Top};
 
 mod gpu;
@@ -19,7 +21,7 @@ struct Tweaks {
     core_freq: String,
     mem_freq: String,
     gpu_temp: String,
-    
+
     mem_usage: String,
 
     toggler_value: bool,
@@ -81,6 +83,7 @@ impl Tweaks {
                 self.nvml.update_gpu_info();
 
                 self.power_watts = self.nvml.power_watts.clone();
+                self.power_watts.push_str(" W");
                 self.core_freq = self.nvml.core_freq.clone();
                 self.mem_freq = self.nvml.mem_freq.clone();
                 self.gpu_temp = self.nvml.gpu_temp.clone();
@@ -131,54 +134,55 @@ impl Tweaks {
                     .padding(5)
                     .align_x(Center)
                     .width(Fill)
-            ].spacing(12).align_y(Center),
+            ]
+            .spacing(12)
+            .align_y(Center),
             row![
                 text("Driver").size(FONT_SIZE_MED).width(100),
                 container(text(self.nvml.get_driver_version()).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .align_x(Center)
-                .width(Fill)
-            ].spacing(12).align_y(Center),
+                    .style(container::rounded_box)
+                    .padding(5)
+                    .align_x(Center)
+                    .width(Fill)
+            ]
+            .spacing(12)
+            .align_y(Center),
             row![
                 text("Memory").size(FONT_SIZE_MED).width(100),
                 container(text(&self.mem_usage).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .align_x(Center)
-                .width(Fill)
-
-            ].spacing(12).align_y(Center),
+                    .style(container::rounded_box)
+                    .padding(5)
+                    .align_x(Center)
+                    .width(Fill)
+            ]
+            .spacing(12)
+            .align_y(Center),
             row![
                 text("GPU %").size(FONT_SIZE_MED).width(100),
                 progress_bar(0.0..=100.0, self.nvml.gpu_utilization.clone() as f32).width(Fill),
                 container(text(self.nvml.gpu_utilization.to_string()).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .align_x(Center)
-            ].spacing(12).align_y(Center),
+                    .style(container::rounded_box)
+                    .padding(5)
+                    .align_x(Center)
+            ]
+            .spacing(12)
+            .align_y(Center),
             row![
                 text("Mem %").size(FONT_SIZE_MED).width(100),
                 progress_bar(0.0..=100.0, self.nvml.mem_utilization.clone() as f32).width(Fill),
                 container(text(self.nvml.mem_utilization.to_string()).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .align_x(Center)
-            ].spacing(12).align_y(Center),
+                    .style(container::rounded_box)
+                    .padding(5)
+                    .align_x(Center)
+            ]
+            .spacing(12)
+            .align_y(Center),
             //text("Encoder %").size(FONT_SIZE_MED).width(100),
             //text("Decoder %").size(FONT_SIZE_MED).width(100),
         ]
         .spacing(12)
         .align_x(Left)
         .padding(10);
-
-        //let info_data = column![
-        //    container(text(self.nvml.get_gpu_name()).size(FONT_SIZE_MED))
-        //        .style(container::rounded_box)
-        //        .padding(10)
-        //]
-        //.spacing(12)
-        //.align_x(Center);
 
         let info_container = column![
             text("Info").size(FONT_SIZE_LG).align_x(Center),
@@ -187,18 +191,32 @@ impl Tweaks {
         .align_x(Left)
         .padding(10);
 
-        //let info_data_combine = row![info_labels, info_data];
+        let clocks_data = column![row![
+            text("Graphics").size(FONT_SIZE_MED).width(100),
+            container(text(&self.core_freq).size(FONT_SIZE_MED))
+                .style(container::rounded_box)
+                .padding(5)
+                .width(Fill)
+                .align_x(Center),
+            container(text(&self.nvml.max_core_freq).size(FONT_SIZE_MED))
+                .style(container::rounded_box)
+                .padding(5)
+                .width(Fill)
+                .align_x(Center),
 
-        //let info_w_label = column![
-        //    text("Info").size(FONT_SIZE_LG).align_x(Center),
-        //    info_data_combine
-        //]
-        //.padding(10);
-        //
-        //let info_container = container(info_w_label)
-        //    .align_x(Left)
-        //    .align_y(Top)
-        //    .style(custom_container);
+        ].spacing(12).padding(10).align_y(Center)]
+        .spacing(12)
+        .align_x(Left)
+        .padding(10);
+
+        let clocks_container = column![
+            text("Clocks (Current/Max)")
+                .size(FONT_SIZE_LG)
+                .align_x(Center),
+            container(clocks_data).style(custom_container)
+        ]
+        .align_x(Left)
+        .padding(10);
 
         let bottom_row = row![toggler, apply_button].spacing(10);
 
@@ -236,9 +254,11 @@ impl Tweaks {
         .align_x(Right)
         .padding(10);
 
+        let left_column = column![info_container, clocks_container];
+
         let settings_column_container = container(settings_column).style(custom_container);
 
-        let content = row![info_container, settings_column_container].spacing(15);
+        let content = row![left_column, settings_column_container].spacing(15);
 
         //center(content).into()
         content.into()

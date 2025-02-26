@@ -15,6 +15,8 @@ pub struct Gpu {
     pub fan_speed: String,
     pub gpu_utilization: u32,
     pub mem_utilization: u32,
+    pub max_core_freq: String,
+    pub max_mem_freq: String,
 }
 
 impl Gpu {
@@ -33,6 +35,8 @@ impl Gpu {
             fan_speed: 0.to_string(),
             gpu_utilization: 0,
             mem_utilization: 0,
+            max_core_freq: 0.to_string(),
+            max_mem_freq: 0.to_string(),
         }
     }
     pub fn update_gpu_info(&mut self) {
@@ -78,12 +82,23 @@ impl Gpu {
             .expect("Unable to get speed for fan 0")
             .to_string();
 
-        let utilization_rates: nvml_wrapper::struct_wrappers::device::Utilization =
-            nvml_device.utilization_rates()
+        let utilization_rates: nvml_wrapper::struct_wrappers::device::Utilization = nvml_device
+            .utilization_rates()
             .expect("Failed to get utilization rates");
 
         self.gpu_utilization = utilization_rates.gpu;
         self.mem_utilization = utilization_rates.memory;
+
+        self.max_core_freq = nvml_device
+            .max_clock_info(Clock::Graphics)
+            .expect("Failed to get graphics clock info")
+            .to_string();
+
+
+        self.max_mem_freq = nvml_device
+            .max_clock_info(Clock::Memory)
+            .expect("Failed to get graphics clock info")
+            .to_string();
     }
 
     //pub fn get_power_watts(&self) -> String {
