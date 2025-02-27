@@ -1,8 +1,9 @@
 use iced::time::{self, Duration};
 use iced::widget::{
-    Column, Row, button, center, column, container, progress_bar, row, text, text_input, toggler,
+    Column, button, column, container, progress_bar, row, text, text_input, toggler,
 };
-use iced::{Alignment, Border, Center, Element, Fill, Left, Right, Subscription, Task, Theme, Top};
+use iced::{Border, Center, Element, Fill, Left, Right, Subscription, Task, Theme};
+use native_dialog::{MessageDialog, MessageType};
 
 mod gpu;
 use gpu::Gpu;
@@ -11,6 +12,8 @@ const FONT_SIZE_SM: f32 = 15.0;
 const FONT_SIZE_MED: f32 = 20.0;
 const FONT_SIZE_LG: f32 = 25.0;
 
+const DARK_THEME: Theme = Theme::Oxocarbon;
+
 struct Tweaks {
     theme: Theme,
     power_watts_input: String,
@@ -18,8 +21,6 @@ struct Tweaks {
     mem_offset_input: String,
 
     power_watts: String,
-    core_freq: String,
-    mem_freq: String,
     gpu_temp: String,
 
     mem_usage: String,
@@ -42,13 +43,11 @@ impl Tweaks {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                theme: Theme::TokyoNight,
+                theme: DARK_THEME,
                 power_watts_input: 0.to_string(),
                 core_offset_input: 0.to_string(),
                 mem_offset_input: 0.to_string(),
                 power_watts: 0.to_string(),
-                core_freq: 0.to_string(),
-                mem_freq: 0.to_string(),
                 gpu_temp: 0.to_string(),
                 mem_usage: 0.to_string(),
                 toggler_value: true,
@@ -72,20 +71,38 @@ impl Tweaks {
             Message::TogglerToggled(value) => {
                 self.toggler_value = value;
                 if self.toggler_value {
-                    self.theme = Theme::TokyoNight;
+                    self.theme = DARK_THEME;
                 } else {
                     self.theme = Theme::Light;
                 }
             }
-            Message::ApplyPressed => {}
+            Message::ApplyPressed => {
+
+                // run the overclock application function
+                let result = self.nvml.apply_oc(
+                    self.core_offset_input.clone(),
+                    self.mem_offset_input.clone(),
+                );
+
+                // check the result we get back to handle errors
+                match result {
+                    Ok(_m) => {}
+                    Err(error) => {
+                        let _ = MessageDialog::new()
+                            .set_type(MessageType::Error)
+                            .set_title("Error")
+                            .set_text(&format!("Error while setting the overclock. Make sure the app is running as sudo. Error Code: {error:?}"))
+                            .show_alert();
+                    }
+                }
+            }
+
             Message::UpdateGPUStats => {
                 // run the actual upate in the background
                 self.nvml.update_gpu_info();
 
                 self.power_watts = self.nvml.power_watts.clone();
                 self.power_watts.push_str(" W");
-                //self.core_freq = self.nvml.clock_speed_array;
-                //self.mem_freq = self.nvml.mem_freq.clone();
                 self.gpu_temp = self.nvml.gpu_temp.clone();
 
                 self.mem_usage = String::from("");
@@ -126,7 +143,6 @@ impl Tweaks {
 
         let apply_button = styled_button("Apply");
 
-
         //------------------------ Info Section -------------------------------
         let info_labels = column![
             row![
@@ -160,7 +176,7 @@ impl Tweaks {
             .spacing(12)
             .align_y(Center),
             row![
-                text("GPU %").size(FONT_SIZE_MED).width(100),
+                text("GPU Use").size(FONT_SIZE_MED).width(100),
                 progress_bar(0.0..=100.0, self.nvml.gpu_utilization.clone() as f32).width(Fill),
                 container(row![
                     text(self.nvml.gpu_utilization.to_string()).size(FONT_SIZE_MED),
@@ -173,7 +189,7 @@ impl Tweaks {
             .spacing(12)
             .align_y(Center),
             row![
-                text("Mem %").size(FONT_SIZE_MED).width(100),
+                text("Mem Use").size(FONT_SIZE_MED).width(100),
                 progress_bar(0.0..=100.0, self.nvml.mem_utilization.clone() as f32).width(Fill),
                 container(row![
                     text(self.nvml.mem_utilization.to_string()).size(FONT_SIZE_MED),
@@ -235,6 +251,38 @@ impl Tweaks {
         .align_x(Left)
         .padding(10);
         // --------------------------------------------------------------------
+        // ----------------------- Overclocking Section -----------------------
+
+        let oc_data = row![
+            column![
+                text("Core Offset (MHz)").size(FONT_SIZE_SM),
+                text_input("0", &self.core_offset_input)
+                    .on_input(Message::CoreChanged)
+                    .padding(10)
+                    .size(FONT_SIZE_MED)
+            ],
+            column![
+                text("Mem Offset (MHz)").size(FONT_SIZE_SM),
+                text_input("0", &self.mem_offset_input)
+                    .on_input(Message::MemChanged)
+                    .padding(10)
+                    .size(FONT_SIZE_MED)
+            ],
+            button(text("Apply").width(50).center())
+                .padding(15)
+                .on_press(Message::ApplyPressed)
+        ]
+        .spacing(12)
+        .align_y(Center)
+        .padding(10);
+
+        let oc_container = column![
+            text("Overclock").size(FONT_SIZE_LG).align_x(Center),
+            container(oc_data).style(custom_container)
+        ]
+        .align_x(Left)
+        .padding(10);
+        //---------------------------------------------------------------------
 
         let bottom_row = row![toggler, apply_button].spacing(10);
 
@@ -249,7 +297,7 @@ impl Tweaks {
         .align_x(Right)
         .padding(10);
 
-        let left_column = column![info_container, clocks_container];
+        let left_column = column![info_container, clocks_container, oc_container];
 
         let settings_column_container = container(settings_column).style(custom_container);
 
@@ -264,24 +312,6 @@ impl Tweaks {
 
     fn gpu_update_stats(&self) -> Subscription<Message> {
         time::every(Duration::from_millis(300)).map(|_x| Message::UpdateGPUStats)
-    }
-
-    fn make_clock_data_row(&self, label: String, index: usize) -> Row<Message> {
-        row![
-            text(label).size(FONT_SIZE_MED).width(100),
-            container(text(&self.nvml.clock_speed_array[index]).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .width(Fill)
-                .align_x(Center),
-            container(text(&self.nvml.clock_speed_max_array[index]).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .width(Fill)
-                .align_x(Center),
-        ]
-        .spacing(12)
-        .align_y(Center)
     }
 }
 

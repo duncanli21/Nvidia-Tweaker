@@ -1,9 +1,11 @@
 use nvml_wrapper::Nvml;
 use nvml_wrapper::enum_wrappers::device::{Clock, TemperatureSensor};
+use nvml_wrapper_sys::bindings::{NvmlLib, nvmlDevice_t, nvmlReturn_t};
 
-// define an array of available clocks to iterate through 
+// define an array of available clocks to iterate through
 const CLOCKS_ARRAY: [Clock; 4] = [Clock::Graphics, Clock::SM, Clock::Memory, Clock::Video];
 
+// struct to hold all the gpu info. Should be available to the main application
 pub struct Gpu {
     pub nvml: Nvml,
     pub power_watts: String,
@@ -20,7 +22,9 @@ pub struct Gpu {
 
 impl Gpu {
     pub fn new() -> Self {
+        // initialize values to something sane
         Self {
+            // actually initialize the NVML library here...
             nvml: Nvml::init().expect("Failed to initialize NVML"),
             power_watts: 0.to_string(),
             gpu_temp: 0.to_string(),
@@ -79,7 +83,7 @@ impl Gpu {
             .memory_info()
             .expect("Failed to get memopry info");
 
-        // convert memory info to scaled strings 
+        // convert memory info to scaled strings
         self.gpu_mem_free = (mem_info.free / 1024000).to_string();
         self.gpu_mem_used = (mem_info.used / 1024000).to_string();
         self.gpu_mem_total = (mem_info.total / 1024000).to_string();
@@ -100,9 +104,8 @@ impl Gpu {
         // split it out into variables
         self.gpu_utilization = utilization_rates.gpu;
         self.mem_utilization = utilization_rates.memory;
-
     }
-   
+
     pub fn get_gpu_name(&self) -> String {
         let nvml_device = self
             .nvml
@@ -116,5 +119,41 @@ impl Gpu {
         self.nvml
             .sys_driver_version()
             .expect("Could not get driver version")
+    }
+
+    // attempt to apply the overclock to the gpu
+    pub fn apply_oc(&self, core_offset: String, mem_offset: String) -> Result<(), String> {
+        // setup variables
+        let nvml_device = self.nvml.device_by_index(0).expect("Failed to get device");
+        let core_off_int = core_offset.parse::<i32>().unwrap();
+        let mem_off_int = mem_offset.parse::<i32>().unwrap();
+
+        // check to see if we are running as root.
+        if sudo2::running_as_root() {
+            // run unsafe block
+            unsafe {
+                let raw_device_handle: nvmlDevice_t = nvml_device.handle();
+                let nvml_lib =
+                    NvmlLib::new("libnvidia-ml.so").expect("Failed to load NVML Library");
+
+                // attempt to set the GPU clock offset
+                let result = nvml_lib.nvmlDeviceSetGpcClkVfOffset(raw_device_handle, core_off_int);
+                if result != 0 {
+                    return Err(format!("{}", result));
+                }
+
+                // attempt to set the gpu mem offset
+                let result = nvml_lib.nvmlDeviceSetMemClkVfOffset(raw_device_handle, mem_off_int);
+                if result != 0 {
+                    return Err(format!("{}", result));
+                } else {
+                    return Ok(());
+                }
+            };
+        }
+        // if we are not running as root then return an error.
+        else {
+            Err(format!("Not running as root"))
+        }
     }
 }
