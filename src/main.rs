@@ -1,6 +1,6 @@
 use iced::time::{self, Duration};
 use iced::widget::{
-    button, center, column, container, progress_bar, row, text, text_input, toggler,
+    Column, Row, button, center, column, container, progress_bar, row, text, text_input, toggler,
 };
 use iced::{Alignment, Border, Center, Element, Fill, Left, Right, Subscription, Task, Theme, Top};
 
@@ -84,8 +84,8 @@ impl Tweaks {
 
                 self.power_watts = self.nvml.power_watts.clone();
                 self.power_watts.push_str(" W");
-                self.core_freq = self.nvml.core_freq.clone();
-                self.mem_freq = self.nvml.mem_freq.clone();
+                //self.core_freq = self.nvml.clock_speed_array;
+                //self.mem_freq = self.nvml.mem_freq.clone();
                 self.gpu_temp = self.nvml.gpu_temp.clone();
 
                 self.mem_usage = String::from("");
@@ -126,6 +126,8 @@ impl Tweaks {
 
         let apply_button = styled_button("Apply");
 
+
+        //------------------------ Info Section -------------------------------
         let info_labels = column![
             row![
                 text("Name").size(FONT_SIZE_MED).width(100),
@@ -160,25 +162,29 @@ impl Tweaks {
             row![
                 text("GPU %").size(FONT_SIZE_MED).width(100),
                 progress_bar(0.0..=100.0, self.nvml.gpu_utilization.clone() as f32).width(Fill),
-                container(text(self.nvml.gpu_utilization.to_string()).size(FONT_SIZE_MED))
-                    .style(container::rounded_box)
-                    .padding(5)
-                    .align_x(Center)
+                container(row![
+                    text(self.nvml.gpu_utilization.to_string()).size(FONT_SIZE_MED),
+                    text("%").size(FONT_SIZE_MED)
+                ])
+                .style(container::rounded_box)
+                .padding(5)
+                .align_x(Center)
             ]
             .spacing(12)
             .align_y(Center),
             row![
                 text("Mem %").size(FONT_SIZE_MED).width(100),
                 progress_bar(0.0..=100.0, self.nvml.mem_utilization.clone() as f32).width(Fill),
-                container(text(self.nvml.mem_utilization.to_string()).size(FONT_SIZE_MED))
-                    .style(container::rounded_box)
-                    .padding(5)
-                    .align_x(Center)
+                container(row![
+                    text(self.nvml.mem_utilization.to_string()).size(FONT_SIZE_MED),
+                    text("%").size(FONT_SIZE_MED)
+                ])
+                .style(container::rounded_box)
+                .padding(5)
+                .align_x(Center)
             ]
             .spacing(12)
             .align_y(Center),
-            //text("Encoder %").size(FONT_SIZE_MED).width(100),
-            //text("Decoder %").size(FONT_SIZE_MED).width(100),
         ]
         .spacing(12)
         .align_x(Left)
@@ -190,33 +196,46 @@ impl Tweaks {
         ]
         .align_x(Left)
         .padding(10);
+        //---------------------------------------------------------------------
+        //-------------------------- Clocks Section ---------------------------
 
-        let clocks_data = column![row![
-            text("Graphics").size(FONT_SIZE_MED).width(100),
-            container(text(&self.core_freq).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .width(Fill)
-                .align_x(Center),
-            container(text(&self.nvml.max_core_freq).size(FONT_SIZE_MED))
-                .style(container::rounded_box)
-                .padding(5)
-                .width(Fill)
-                .align_x(Center),
+        // set up some labels for the gpu clocks section
+        let graphics_labels = ["Graphics", "SM", "Memory", "Video"];
 
-        ].spacing(12).padding(10).align_y(Center)]
-        .spacing(12)
-        .align_x(Left)
-        .padding(10);
+        // make a column to hold all the clock speeds
+        let mut clock_data = Column::new().spacing(12).align_x(Left).padding(10);
+
+        // loop through the labels to retreive the clock speeds and create rows
+        for (index, label) in graphics_labels.iter().enumerate() {
+            clock_data = clock_data.push(
+                row![
+                    text(*label).size(FONT_SIZE_MED).width(100),
+                    container(text(&self.nvml.clock_speed_array[index]).size(FONT_SIZE_MED))
+                        .style(container::rounded_box)
+                        .padding(5)
+                        .width(Fill)
+                        .align_x(Center),
+                    container(text(&self.nvml.clock_speed_max_array[index]).size(FONT_SIZE_MED))
+                        .style(container::rounded_box)
+                        .padding(5)
+                        .width(Fill)
+                        .align_x(Center),
+                ]
+                .spacing(12)
+                .align_y(Center),
+            );
+        }
 
         let clocks_container = column![
             text("Clocks (Current/Max)")
                 .size(FONT_SIZE_LG)
                 .align_x(Center),
-            container(clocks_data).style(custom_container)
+            container(clock_data).style(custom_container)
         ]
         .align_x(Left)
         .padding(10);
+
+        // --------------------------------------------------------------------
 
         let bottom_row = row![toggler, apply_button].spacing(10);
 
@@ -270,6 +289,24 @@ impl Tweaks {
 
     fn gpu_update_stats(&self) -> Subscription<Message> {
         time::every(Duration::from_millis(300)).map(|_x| Message::UpdateGPUStats)
+    }
+
+    fn make_clock_data_row(&self, label: String, index: usize) -> Row<Message> {
+        row![
+            text(label).size(FONT_SIZE_MED).width(100),
+            container(text(&self.nvml.clock_speed_array[index]).size(FONT_SIZE_MED))
+                .style(container::rounded_box)
+                .padding(5)
+                .width(Fill)
+                .align_x(Center),
+            container(text(&self.nvml.clock_speed_max_array[index]).size(FONT_SIZE_MED))
+                .style(container::rounded_box)
+                .padding(5)
+                .width(Fill)
+                .align_x(Center),
+        ]
+        .spacing(12)
+        .align_y(Center)
     }
 }
 
