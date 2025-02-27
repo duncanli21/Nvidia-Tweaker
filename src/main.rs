@@ -234,34 +234,10 @@ impl Tweaks {
         ]
         .align_x(Left)
         .padding(10);
-
         // --------------------------------------------------------------------
 
         let bottom_row = row![toggler, apply_button].spacing(10);
 
-        //let stats_column = column![
-        //    text("GPU Stats").size(FONT_SIZE_LG),
-        //    row![
-        //        text("Core Clock ").size(FONT_SIZE_LG),
-        //        container(text(self.core_freq.clone()).size(FONT_SIZE_MED))
-        //            .style(container::rounded_box)
-        //            .center(60) //.width(60)
-        //    ],
-        //    row![
-        //        text("Memory Clock ").size(FONT_SIZE_MED),
-        //        text(self.mem_freq.clone())
-        //    ],
-        //    row![
-        //        text("Power ").size(FONT_SIZE_MED),
-        //        text(self.power_watts.clone())
-        //    ],
-        //    row![
-        //        text("Temp ").size(FONT_SIZE_MED),
-        //        text(self.gpu_temp.clone())
-        //    ],
-        //]
-        //.spacing(10);
-        //
         let settings_column = column![
             text("Settings").size(FONT_SIZE_LG),
             row![text("Core Offset ").size(FONT_SIZE_MED), core_input],
@@ -279,7 +255,6 @@ impl Tweaks {
 
         let content = row![left_column, settings_column_container].spacing(15);
 
-        //center(content).into()
         content.into()
     }
 
