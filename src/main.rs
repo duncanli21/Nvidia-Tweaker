@@ -2,7 +2,7 @@ use iced::time::{self, Duration};
 use iced::widget::{
     Column, button, column, container, progress_bar, row, text, text_input, toggler,
 };
-use iced::{Border, Center, Element, Fill, Left, Right, Subscription, Task, Theme};
+use iced::{Border, Center, Element, Fill, Left, Right, Bottom, Subscription, Task, Theme};
 use native_dialog::{MessageDialog, MessageType};
 
 mod gpu;
@@ -16,9 +16,13 @@ const DARK_THEME: Theme = Theme::Oxocarbon;
 
 struct Tweaks {
     theme: Theme,
+
     power_watts_input: String,
     core_offset_input: String,
     mem_offset_input: String,
+
+    core_offset_real: String,
+    mem_offset_real: String,
 
     power_watts: String,
     gpu_temp: String,
@@ -47,6 +51,8 @@ impl Tweaks {
                 power_watts_input: 0.to_string(),
                 core_offset_input: 0.to_string(),
                 mem_offset_input: 0.to_string(),
+                core_offset_real: 0.to_string(),
+                mem_offset_real: 0.to_string(),
                 power_watts: 0.to_string(),
                 gpu_temp: 0.to_string(),
                 mem_usage: 0.to_string(),
@@ -77,7 +83,6 @@ impl Tweaks {
                 }
             }
             Message::ApplyPressed => {
-
                 // run the overclock application function
                 let result = self.nvml.apply_oc(
                     self.core_offset_input.clone(),
@@ -110,6 +115,34 @@ impl Tweaks {
                 self.mem_usage.push_str(" MiB/");
                 self.mem_usage.push_str(&self.nvml.gpu_mem_total);
                 self.mem_usage.push_str(" MiB");
+
+                let core_off = self.nvml.get_gpu_offset();
+                match core_off {
+                    Ok(core_off) => self.core_offset_real = core_off.to_string(),
+                    Err(e) => {
+                        let _ = MessageDialog::new()
+                            .set_type(MessageType::Error)
+                            .set_title("Error")
+                            .set_text(&format!(
+                                "Error reading the core clock offset. Error Code {e:?}"
+                            ))
+                            .show_alert();
+                    }
+                }
+
+                let mem_off = self.nvml.get_mem_offset();
+                match mem_off {
+                    Ok(mem_off) => self.mem_offset_real = mem_off.to_string(),
+                    Err(e) => {
+                        let _ = MessageDialog::new()
+                            .set_type(MessageType::Error)
+                            .set_title("Error")
+                            .set_text(&format!(
+                                "Error reading the mem clock offset. Error Code {e:?}"
+                            ))
+                            .show_alert();
+                    }
+                }
             }
         }
     }
@@ -253,28 +286,54 @@ impl Tweaks {
         // --------------------------------------------------------------------
         // ----------------------- Overclocking Section -----------------------
 
-        let oc_data = row![
-            column![
-                text("Core Offset (MHz)").size(FONT_SIZE_SM),
-                text_input("0", &self.core_offset_input)
-                    .on_input(Message::CoreChanged)
-                    .padding(10)
-                    .size(FONT_SIZE_MED)
-            ],
-            column![
-                text("Mem Offset (MHz)").size(FONT_SIZE_SM),
-                text_input("0", &self.mem_offset_input)
-                    .on_input(Message::MemChanged)
-                    .padding(10)
-                    .size(FONT_SIZE_MED)
-            ],
-            button(text("Apply").width(50).center())
-                .padding(15)
-                .on_press(Message::ApplyPressed)
-        ]
-        .spacing(12)
-        .align_y(Center)
-        .padding(10);
+        let oc_data = column![
+            row![
+                column![
+                    text("Set Core Offset (MHz)").size(FONT_SIZE_SM),
+                    text_input("0", &self.core_offset_input)
+                        .on_input(Message::CoreChanged)
+                        .padding(10)
+                        .size(FONT_SIZE_MED)
+                ],
+                column![
+                    text("Set Mem Offset (MHz)").size(FONT_SIZE_SM),
+                    text_input("0", &self.mem_offset_input)
+                        .on_input(Message::MemChanged)
+                        .padding(10)
+                        .size(FONT_SIZE_MED)
+                ],
+                button(text("Apply").width(50).center())
+                    .padding(15)
+                    .on_press(Message::ApplyPressed)
+            ]
+            .spacing(12)
+            .align_y(Bottom)
+            .padding(10),
+            row![
+                column![
+                    text("Core Offset (MHz)").size(FONT_SIZE_SM),
+                    container(text(&self.core_offset_real).size(FONT_SIZE_MED))
+                        .style(container::rounded_box)
+                        .padding(5)
+                        .width(Fill)
+                        .align_x(Center),
+                ],
+                column![
+                    text("Mem Offset (MHz)").size(FONT_SIZE_SM),
+                    container(text(&self.mem_offset_real).size(FONT_SIZE_MED))
+                        .style(container::rounded_box)
+                        .padding(5)
+                        .width(Fill)
+                        .align_x(Center),
+                ],
+                //button(text("Apply").width(50).center())
+                //    .padding(15)
+                //    .on_press(Message::ApplyPressed)
+            ]
+            .spacing(12)
+            .align_y(Center)
+            .padding(10),
+        ];
 
         let oc_container = column![
             text("Overclock").size(FONT_SIZE_LG).align_x(Center),

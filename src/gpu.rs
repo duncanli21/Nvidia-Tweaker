@@ -1,5 +1,8 @@
-use nvml_wrapper::Nvml;
 use nvml_wrapper::enum_wrappers::device::{Clock, TemperatureSensor};
+use nvml_wrapper::{
+    Nvml,
+    error::{NvmlError, nvml_try},
+};
 use nvml_wrapper_sys::bindings::{NvmlLib, nvmlDevice_t, nvmlReturn_t};
 
 // define an array of available clocks to iterate through
@@ -18,6 +21,20 @@ pub struct Gpu {
     pub mem_utilization: u32,
     pub clock_speed_array: [u32; 4],
     pub clock_speed_max_array: [u32; 4],
+}
+
+fn get_value<T, F>(f: F) -> Result<T, Option<NvmlError>>
+where
+    T: Default,
+    F: FnOnce(*mut T) -> nvmlReturn_t,
+{
+    let mut value = T::default();
+    let status = f(&mut value);
+    if status == 0 {
+        Ok(value)
+    } else {
+        Err(nvml_try(status).err())
+    }
 }
 
 impl Gpu {
@@ -154,6 +171,28 @@ impl Gpu {
         // if we are not running as root then return an error.
         else {
             Err(format!("Not running as root"))
+        }
+    }
+
+    pub fn get_gpu_offset(&self) -> Result<i32, Option<NvmlError>> {
+        let nvml_device = self.nvml.device_by_index(0).expect("Failed to get device");
+
+        unsafe {
+            let raw_device_handle: nvmlDevice_t = nvml_device.handle();
+            let nvml_lib = NvmlLib::new("libnvidia-ml.so").expect("Failed to load NVML Library");
+
+            get_value(|offset| nvml_lib.nvmlDeviceGetGpcClkVfOffset(raw_device_handle, offset))
+        }
+    }
+
+    pub fn get_mem_offset(&self) -> Result<i32, Option<NvmlError>> {
+        let nvml_device = self.nvml.device_by_index(0).expect("Failed to get device");
+
+        unsafe {
+            let raw_device_handle: nvmlDevice_t = nvml_device.handle();
+            let nvml_lib = NvmlLib::new("libnvidia-ml.so").expect("Failed to load NVML Library");
+
+            get_value(|offset| nvml_lib.nvmlDeviceGetMemClkVfOffset(raw_device_handle, offset))
         }
     }
 }
